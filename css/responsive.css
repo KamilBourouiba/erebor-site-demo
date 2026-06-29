@@ -57,7 +57,9 @@
   .workspace {
     display: flex;
     flex-direction: column;
+    grid-template-columns: unset;
     min-height: 0;
+    width: 100%;
   }
 
   .canvas-wrap {
@@ -66,6 +68,7 @@
     width: 100%;
     min-height: 240px;
     height: min(42vh, 360px);
+    overflow: hidden;
     border-left: none;
     border-right: none;
     border-bottom: 1px solid var(--line);
