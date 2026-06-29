@@ -7,6 +7,7 @@ import {
   directGithubRepo,
   directOpenAlexWork,
   directSearch,
+  fetchLiveGraph,
 } from "./oss.js";
 
 const ON_PAGES =
@@ -45,7 +46,10 @@ async function post(path, body) {
 export const api = {
   health: () => (USE_DIRECT_OSS ? Promise.resolve({ status: "ok", product: "erebor", mode: "direct-oss" }) : get("/health")),
   catalog: () => (USE_DIRECT_OSS ? Promise.resolve(OSS_CATALOG) : get("/catalog")),
-  graph: () => (USE_DIRECT_OSS ? Promise.resolve(SEED_GRAPH) : get("/graph")),
+  graph: () =>
+    USE_DIRECT_OSS
+      ? fetchLiveGraph().catch(() => SEED_GRAPH)
+      : get("/graph"),
   search: (q) => (USE_DIRECT_OSS ? directSearch(q) : get(`/search?q=${encodeURIComponent(q)}`)),
   githubRepo: (owner, repo) =>
     USE_DIRECT_OSS ? directGithubRepo(owner, repo) : get(`/github/${owner}/${repo}`),
