@@ -1,38 +1,58 @@
 import * as THREE from 'three';
 
-const SVG_NS = 'http://www.w3.org/2000/svg';
+const MOBILE_BREAKPOINT = 768;
+const DEFAULT_EMPTY_TITLE = 'No entity selected';
+const DEFAULT_EMPTY_BODY = 'Select a node on the globe or open a search result to inspect linked metadata, relationships, and timeline activity.';
 
-function el(tag, className, text) {
-  const node = document.createElement(tag);
-  if (className) node.className = className;
-  if (text !== undefined && text !== null) node.textContent = text;
-  return node;
+function qs(root, selector) {
+  return root ? root.querySelector(selector) : null;
 }
 
-function svgEl(tag, attrs = {}) {
-  const node = document.createElementNS(SVG_NS, tag);
-  Object.entries(attrs).forEach(([key, value]) => {
-    node.setAttribute(key, String(value));
-  });
-  return node;
-}
-
-function clearNode(node) {
-  while (node.firstChild) node.removeChild(node.firstChild);
+function qsa(root, selector) {
+  return root ? Array.from(root.querySelectorAll(selector)) : [];
 }
 
 function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value));
 }
 
+function isObject(value) {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function toArray(value) {
+  if (Array.isArray(value)) return value;
+  if (value == null) return [];
+  return [value];
+}
+
+function uniqueBy(items, keyFn) {
+  const seen = new Set();
+  return items.filter((item) => {
+    const key = keyFn(item);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
+}
+
 function formatNumber(value) {
-  if (value === null || value === undefined || Number.isNaN(Number(value))) return '—';
-  return new Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 1 }).format(Number(value));
+  if (typeof value !== 'number' || Number.isNaN(value)) return '—';
+  return new Intl.NumberFormat('en-US', { maximumFractionDigits: 1 }).format(value);
 }
 
 function formatDate(value) {
   if (!value) return 'Unknown';
-  const date = new Date(value);
+  const date = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(date.getTime())) return String(value);
   return new Intl.DateTimeFormat('en-US', {
     year: 'numeric',
@@ -43,7 +63,7 @@ function formatDate(value) {
 
 function formatDateTime(value) {
   if (!value) return 'Unknown';
-  const date = new Date(value);
+  const date = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(date.getTime())) return String(value);
   return new Intl.DateTimeFormat('en-US', {
     year: 'numeric',
@@ -54,444 +74,429 @@ function formatDateTime(value) {
   }).format(date);
 }
 
-function truncate(text, length = 180) {
-  if (!text) return '';
-  const normalized = String(text).replace(/\s+/g, ' ').trim();
-  if (normalized.length <= length) return normalized;
-  return `${normalized.slice(0, length - 1).trimEnd()}…`;
+function truncate(value, max = 180) {
+  const text = String(value ?? '').trim();
+  if (text.length <= max) return text;
+  return `${text.slice(0, max - 1).trimEnd()}…`;
 }
 
-function initialsFromLabel(label = '') {
-  const parts = String(label).trim().split(/\s+/).filter(Boolean);
-  if (!parts.length) return '?';
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-  return `${parts[0][0] || ''}${parts[1][0] || ''}`.toUpperCase();
+function initialsFromName(name) {
+  const parts = String(name ?? '')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2);
+  if (!parts.length) return '—';
+  return parts.map((part) => part[0]?.toUpperCase() ?? '').join('');
 }
 
-function hashString(input = '') {
+function hashString(value) {
+  const text = String(value ?? '');
   let hash = 0;
-  for (let i = 0; i < input.length; i += 1) {
-    hash = ((hash << 5) - hash) + input.charCodeAt(i);
+  for (let i = 0; i < text.length; i += 1) {
+    hash = (hash << 5) - hash + text.charCodeAt(i);
     hash |= 0;
   }
   return Math.abs(hash);
 }
 
-function colorFromType(type = 'entity') {
-  const palette = {
-    person: '#8fd6e6',
-    organization: '#7fd0a6',
-    institution: '#7fd0a6',
-    repository: '#e8be87',
-    paper: '#c6b3ff',
-    place: '#f0a7c1',
-    location: '#f0a7c1',
-    event: '#f08d8d',
-    entity: '#9fb2c8',
-  };
-  return palette[String(type).toLowerCase()] || palette.entity;
+function sourceTone(source) {
+  const normalized = String(source ?? '').toLowerCase();
+  if (normalized.includes('github')) return 'cyan';
+  if (normalized.includes('openalex')) return 'amber';
+  if (normalized.includes('nominatim') || normalized.includes('osm')) return 'slate';
+  return ['cyan', 'amber', 'slate'][hashString(normalized) % 3];
 }
 
-function normalizeEntity(entity = {}) {
-  const type = entity.type || entity.kind || entity.entity_type || 'entity';
-  const label = entity.label || entity.name || entity.title || entity.login || 'Untitled entity';
-  const id = entity.id || entity.key || entity.nodeId || entity.slug || `${type}:${label}`;
-  const description = entity.description || entity.summary || entity.abstract || entity.bio || '';
-  const source = entity.source || entity.provider || entity.origin || 'local';
-  const score = entity.score ?? entity.rank ?? entity.relevance ?? null;
-  const updatedAt = entity.updatedAt || entity.updated_at || entity.modified || entity.timestamp || null;
-  const metrics = entity.metrics || {};
-  const location = entity.location || entity.geo || null;
-
-  return {
-    ...entity,
-    id,
-    type,
-    label,
-    description,
-    source,
-    score,
-    updatedAt,
-    metrics,
-    location,
-  };
+function entityTypeTone(type) {
+  const normalized = String(type ?? '').toLowerCase();
+  if (normalized.includes('repo') || normalized.includes('code')) return 'cyan';
+  if (normalized.includes('author') || normalized.includes('person')) return 'amber';
+  if (normalized.includes('place') || normalized.includes('geo') || normalized.includes('location')) return 'slate';
+  if (normalized.includes('paper') || normalized.includes('work')) return 'amber';
+  return ['cyan', 'amber', 'slate'][hashString(normalized) % 3];
 }
 
-function normalizeSearchResult(result = {}) {
-  const source = result.source || result.provider || 'unknown';
-  const type = result.type || result.kind || 'result';
-  const title = result.title || result.label || result.name || result.login || 'Untitled result';
-  const subtitle = result.subtitle || result.full_name || result.display_name || result.host_venue || '';
-  const description = result.description || result.abstract || result.bio || result.summary || '';
-  const url = result.url || result.html_url || result.homepage || result.landing_page || result.id || '#';
-  const id = result.id || result.key || `${source}:${title}:${hashString(url)}`;
-  const meta = result.meta || {};
+function normalizeSourceLabel(source) {
+  const normalized = String(source ?? '').toLowerCase();
+  if (normalized === 'github') return 'GitHub';
+  if (normalized === 'openalex') return 'OpenAlex';
+  if (normalized === 'nominatim') return 'Nominatim';
+  return source || 'Unknown';
+}
+
+function normalizeEntity(raw = {}) {
+  const source = raw.source || raw.provider || raw.origin || 'Unknown';
+  const type = raw.type || raw.entityType || raw.kind || 'Entity';
+  const id =
+    raw.id ||
+    raw.entityId ||
+    raw.key ||
+    raw.nodeId ||
+    raw.url ||
+    `${source}:${type}:${raw.name || raw.title || raw.label || Math.random().toString(36).slice(2)}`;
+
+  const title =
+    raw.title ||
+    raw.name ||
+    raw.label ||
+    raw.login ||
+    raw.display_name ||
+    raw.full_name ||
+    raw.primary_name ||
+    'Untitled entity';
+
+  const subtitle =
+    raw.subtitle ||
+    raw.full_name ||
+    raw.login ||
+    raw.host ||
+    raw.country ||
+    raw.typeLabel ||
+    '';
+
+  const description =
+    raw.description ||
+    raw.summary ||
+    raw.abstract ||
+    raw.bio ||
+    raw.display_name ||
+    raw.snippet ||
+    '';
+
+  const score =
+    typeof raw.score === 'number'
+      ? raw.score
+      : typeof raw.relevance === 'number'
+        ? raw.relevance
+        : typeof raw.stars === 'number'
+          ? raw.stars
+          : null;
+
+  const coordinates =
+    raw.coordinates ||
+    (typeof raw.lat === 'number' && typeof raw.lon === 'number'
+      ? { lat: raw.lat, lon: raw.lon }
+      : typeof raw.latitude === 'number' && typeof raw.longitude === 'number'
+        ? { lat: raw.latitude, lon: raw.longitude }
+        : null);
+
+  const links = uniqueBy(
+    [
+      ...(Array.isArray(raw.links) ? raw.links : []),
+      raw.html_url ? { label: 'Open source', href: raw.html_url } : null,
+      raw.url && /^https?:\/\//.test(raw.url) ? { label: 'Source record', href: raw.url } : null,
+      raw.homepage ? { label: 'Homepage', href: raw.homepage } : null,
+      raw.orcid ? { label: 'ORCID', href: raw.orcid } : null,
+    ].filter(Boolean),
+    (item) => item.href || item.label,
+  );
+
+  const metrics = raw.metrics || {};
+  const tags = uniqueBy(
+    [
+      ...(Array.isArray(raw.tags) ? raw.tags : []),
+      ...(Array.isArray(raw.topics) ? raw.topics : []),
+      ...(Array.isArray(raw.keywords) ? raw.keywords : []),
+      raw.language || null,
+      raw.country_code || null,
+    ]
+      .filter(Boolean)
+      .map((item) => (typeof item === 'string' ? item : item.name || item.label || '')),
+    (item) => item.toLowerCase(),
+  ).slice(0, 12);
+
+  const timeline = toArray(raw.timeline || raw.events).map((event, index) => ({
+    id: event.id || `${id}:event:${index}`,
+    title: event.title || event.label || event.type || 'Activity',
+    detail: event.detail || event.description || event.summary || '',
+    date: event.date || event.timestamp || event.created_at || event.updated_at || null,
+    tone: event.tone || event.severity || 'neutral',
+    source: event.source || source,
+  }));
+
+  const relationships = toArray(raw.relationships || raw.linksTo || raw.edges).map((rel, index) => ({
+    id: rel.id || `${id}:rel:${index}`,
+    label: rel.label || rel.type || rel.relation || 'Linked',
+    target: rel.target || rel.name || rel.title || rel.id || 'Unknown',
+    source: rel.source || source,
+    weight: rel.weight ?? rel.score ?? null,
+  }));
 
   return {
-    ...result,
     id,
-    source,
+    source: normalizeSourceLabel(source),
     type,
     title,
     subtitle,
     description,
-    url,
-    meta,
-  };
-}
-
-function normalizeTimelineEvent(event = {}) {
-  return {
-    id: event.id || event.key || `${event.type || 'event'}:${event.timestamp || event.date || Math.random()}`,
-    type: event.type || event.kind || 'event',
-    title: event.title || event.label || 'Untitled event',
-    description: event.description || event.summary || '',
-    timestamp: event.timestamp || event.date || event.created_at || event.updated_at || null,
-    actor: event.actor || event.source || null,
-    status: event.status || null,
-    meta: event.meta || {},
+    score,
+    coordinates,
+    links,
+    tags,
+    metrics: {
+      stars: raw.stargazers_count ?? raw.stars ?? metrics.stars ?? null,
+      forks: raw.forks_count ?? raw.forks ?? metrics.forks ?? null,
+      watchers: raw.watchers_count ?? raw.watchers ?? metrics.watchers ?? null,
+      citations: raw.cited_by_count ?? raw.citations ?? metrics.citations ?? null,
+      works: raw.works_count ?? metrics.works ?? null,
+      followers: raw.followers ?? metrics.followers ?? null,
+    },
+    updatedAt: raw.updated_at || raw.updatedAt || raw.modified || raw.timestamp || null,
+    createdAt: raw.created_at || raw.createdAt || null,
+    location:
+      raw.location ||
+      raw.display_name ||
+      (coordinates ? `${formatNumber(coordinates.lat)}, ${formatNumber(coordinates.lon)}` : ''),
+    raw,
+    timeline,
+    relationships,
   };
 }
 
 function ensurePanelStyles() {
-  if (document.getElementById('erebor-panels-styles')) return;
+  if (document.getElementById('erebor-panels-inline-styles')) return;
 
   const style = document.createElement('style');
-  style.id = 'erebor-panels-styles';
+  style.id = 'erebor-panels-inline-styles';
   style.textContent = `
-    .erebor-panel {
+    .panel-shell {
       display: flex;
       flex-direction: column;
       min-height: 0;
-      border: var(--canvas-panel-border, 1px solid rgba(170, 182, 200, 0.14));
-      border-radius: var(--canvas-panel-radius, 1rem);
-      background: var(--canvas-panel-bg, linear-gradient(180deg, rgba(22, 28, 36, 0.9) 0%, rgba(12, 16, 22, 0.94) 100%));
-      box-shadow: var(--canvas-panel-shadow, 0 20px 48px rgba(0, 0, 0, 0.34));
-      backdrop-filter: var(--canvas-panel-blur, blur(18px));
+      min-width: 0;
+      background: linear-gradient(180deg, rgba(18,25,34,0.82), rgba(10,14,20,0.92));
+      border: 1px solid rgba(111,130,157,0.18);
+      border-radius: 1rem;
+      box-shadow: 0 18px 40px rgba(0,0,0,0.28);
       overflow: hidden;
-      color: var(--canvas-text, #eef3f8);
+      backdrop-filter: blur(18px);
     }
 
-    .erebor-panel__header {
+    .panel-header {
       display: flex;
       align-items: center;
       justify-content: space-between;
       gap: 0.75rem;
-      padding: 0.9rem 1rem 0.8rem;
-      border-bottom: 1px solid rgba(170, 182, 200, 0.1);
+      padding: 0.9rem 1rem;
+      border-bottom: 1px solid rgba(111,130,157,0.14);
       background:
-        linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0)),
-        linear-gradient(180deg, rgba(18, 24, 31, 0.72), rgba(18, 24, 31, 0.3));
+        linear-gradient(180deg, rgba(255,255,255,0.02), transparent),
+        linear-gradient(180deg, rgba(20,28,38,0.96), rgba(12,17,24,0.96));
     }
 
-    .erebor-panel__title-wrap {
+    .panel-header__meta {
       min-width: 0;
-      display: flex;
-      flex-direction: column;
-      gap: 0.2rem;
     }
 
-    .erebor-panel__title {
-      font-size: 0.95rem;
+    .panel-kicker {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      font-size: 0.7rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--text-muted, #6f829d);
+      margin-bottom: 0.2rem;
+    }
+
+    .panel-title {
+      margin: 0;
+      font-size: 0.98rem;
       font-weight: 600;
-      letter-spacing: -0.01em;
-      color: var(--canvas-text, #eef3f8);
+      color: var(--text-primary, #e5ebf3);
     }
 
-    .erebor-panel__subtitle {
-      font-size: 0.75rem;
-      color: var(--canvas-muted, #8f9baa);
+    .panel-subtitle {
+      margin: 0.15rem 0 0;
+      font-size: 0.8rem;
+      color: var(--text-secondary, #9aabc2);
     }
 
-    .erebor-panel__body {
+    .panel-body {
       min-height: 0;
       overflow: auto;
-      padding: 0.75rem;
-      display: flex;
-      flex-direction: column;
-      gap: 0.75rem;
+      padding: 0.9rem;
     }
 
-    .erebor-toolbar {
+    .panel-toolbar {
       display: flex;
       align-items: center;
       gap: 0.5rem;
       flex-wrap: wrap;
     }
 
-    .erebor-input,
-    .erebor-select,
-    .erebor-button {
-      border-radius: 0.8rem;
-      border: 1px solid rgba(170, 182, 200, 0.14);
-      background: rgba(10, 14, 19, 0.72);
-      color: var(--canvas-text, #eef3f8);
-      transition:
-        border-color 160ms ease,
-        background-color 160ms ease,
-        transform 160ms ease,
-        box-shadow 160ms ease;
+    .panel-button {
+      appearance: none;
+      border: 1px solid rgba(111,130,157,0.18);
+      background: rgba(255,255,255,0.02);
+      color: var(--text-secondary, #9aabc2);
+      border-radius: 999px;
+      min-height: 2.25rem;
+      padding: 0 0.8rem;
+      font: inherit;
+      font-size: 0.8rem;
+      cursor: pointer;
+      transition: background 140ms ease, border-color 140ms ease, color 140ms ease, transform 140ms ease;
     }
 
-    .erebor-input,
-    .erebor-select {
-      min-height: 2.5rem;
-      padding: 0.65rem 0.8rem;
-      width: 100%;
+    .panel-button:hover,
+    .panel-button:focus-visible {
       outline: none;
+      color: var(--text-primary, #e5ebf3);
+      border-color: rgba(79,192,222,0.38);
+      background: rgba(79,192,222,0.08);
     }
 
-    .erebor-input::placeholder {
-      color: rgba(184, 195, 207, 0.55);
+    .panel-button.is-active {
+      color: #dff7ff;
+      border-color: rgba(79,192,222,0.42);
+      background: rgba(79,192,222,0.14);
+      box-shadow: inset 0 0 0 1px rgba(79,192,222,0.12);
     }
 
-    .erebor-input:focus,
-    .erebor-select:focus {
-      border-color: rgba(143, 214, 230, 0.42);
-      box-shadow: 0 0 0 3px rgba(143, 214, 230, 0.12);
-    }
-
-    .erebor-button {
-      min-height: 2.4rem;
-      padding: 0.6rem 0.85rem;
-      font-size: 0.82rem;
-      font-weight: 500;
-      letter-spacing: 0.01em;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 0.45rem;
-      white-space: nowrap;
-    }
-
-    .erebor-button:hover {
-      border-color: rgba(143, 214, 230, 0.28);
-      background: rgba(16, 22, 29, 0.9);
-    }
-
-    .erebor-button:active {
-      transform: translateY(1px);
-    }
-
-    .erebor-button--accent {
-      border-color: rgba(143, 214, 230, 0.24);
-      background:
-        linear-gradient(180deg, rgba(143, 214, 230, 0.14), rgba(143, 214, 230, 0.06)),
-        rgba(10, 14, 19, 0.82);
-      color: var(--canvas-accent-strong, #b8edf6);
-    }
-
-    .erebor-chip-row {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.45rem;
-    }
-
-    .erebor-chip {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.35rem;
-      min-height: 1.8rem;
-      padding: 0.3rem 0.55rem;
-      border-radius: 999px;
-      border: 1px solid var(--canvas-chip-border, rgba(143, 214, 230, 0.16));
-      background: var(--canvas-chip-bg, rgba(143, 214, 230, 0.08));
-      color: var(--canvas-chip-text, #d5dee8);
-      font-size: 0.72rem;
-      line-height: 1;
-      white-space: nowrap;
-    }
-
-    .erebor-chip__dot {
-      width: 0.45rem;
-      height: 0.45rem;
-      border-radius: 999px;
-      flex: 0 0 auto;
-      box-shadow: 0 0 12px currentColor;
-    }
-
-    .erebor-list {
-      display: flex;
-      flex-direction: column;
-      gap: 0.55rem;
-      min-height: 0;
-    }
-
-    .erebor-card {
+    .panel-search {
       position: relative;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      min-width: 0;
+      flex: 1 1 12rem;
+    }
+
+    .panel-search input {
+      width: 100%;
+      min-height: 2.5rem;
+      border-radius: 0.8rem;
+      border: 1px solid rgba(111,130,157,0.18);
+      background: rgba(8,11,16,0.72);
+      color: var(--text-primary, #e5ebf3);
+      padding: 0 0.9rem;
+      font: inherit;
+    }
+
+    .panel-search input::placeholder {
+      color: var(--text-muted, #6f829d);
+    }
+
+    .panel-search input:focus-visible {
+      outline: none;
+      box-shadow: 0 0 0 1px rgba(79,192,222,0.55), 0 0 0 4px rgba(79,192,222,0.14);
+      border-color: rgba(79,192,222,0.38);
+    }
+
+    .entity-list,
+    .results-list,
+    .timeline-list,
+    .relationship-list {
+      display: grid;
+      gap: 0.7rem;
+    }
+
+    .entity-card,
+    .result-card,
+    .timeline-card,
+    .relationship-card {
+      position: relative;
+      display: grid;
+      gap: 0.65rem;
+      padding: 0.9rem;
+      border-radius: 0.95rem;
+      border: 1px solid rgba(111,130,157,0.16);
+      background:
+        linear-gradient(180deg, rgba(255,255,255,0.02), transparent),
+        rgba(11,15,20,0.72);
+      transition: transform 140ms ease, border-color 140ms ease, background 140ms ease, box-shadow 140ms ease;
+    }
+
+    .entity-card[role="button"],
+    .result-card[role="button"] {
+      cursor: pointer;
+    }
+
+    .entity-card:hover,
+    .entity-card:focus-visible,
+    .result-card:hover,
+    .result-card:focus-visible {
+      outline: none;
+      transform: translateY(-1px);
+      border-color: rgba(79,192,222,0.28);
+      box-shadow: 0 12px 28px rgba(0,0,0,0.22);
+      background:
+        linear-gradient(180deg, rgba(79,192,222,0.05), transparent),
+        rgba(14,19,26,0.88);
+    }
+
+    .entity-card.is-active,
+    .result-card.is-active {
+      border-color: rgba(79,192,222,0.42);
+      box-shadow: 0 0 0 1px rgba(79,192,222,0.12), 0 16px 36px rgba(0,0,0,0.24);
+      background:
+        linear-gradient(180deg, rgba(79,192,222,0.08), transparent),
+        rgba(14,19,26,0.92);
+    }
+
+    .entity-card__top,
+    .result-card__top,
+    .inspector-hero {
       display: grid;
       grid-template-columns: auto 1fr auto;
       gap: 0.75rem;
       align-items: start;
-      padding: 0.8rem;
-      border-radius: 0.95rem;
-      border: 1px solid rgba(170, 182, 200, 0.12);
-      background:
-        linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0)),
-        rgba(11, 15, 20, 0.72);
-      transition:
-        border-color 180ms ease,
-        background-color 180ms ease,
-        transform 180ms ease,
-        box-shadow 180ms ease;
-      cursor: pointer;
-      text-align: left;
-      width: 100%;
+      min-width: 0;
     }
 
-    .erebor-card:hover {
-      border-color: rgba(143, 214, 230, 0.24);
-      background: rgba(14, 19, 25, 0.9);
-      transform: translateY(-1px);
-      box-shadow: 0 10px 24px rgba(0, 0, 0, 0.18);
-    }
-
-    .erebor-card.is-active {
-      border-color: rgba(143, 214, 230, 0.34);
-      box-shadow:
-        0 0 0 1px rgba(143, 214, 230, 0.18) inset,
-        0 14px 28px rgba(0, 0, 0, 0.22);
-      background:
-        linear-gradient(180deg, rgba(143, 214, 230, 0.08), rgba(143, 214, 230, 0.02)),
-        rgba(14, 19, 25, 0.94);
-    }
-
-    .erebor-card__avatar {
-      width: 2.25rem;
-      height: 2.25rem;
+    .entity-avatar,
+    .result-avatar,
+    .inspector-avatar {
+      width: 2.5rem;
+      height: 2.5rem;
       border-radius: 0.8rem;
       display: grid;
       place-items: center;
-      font-size: 0.78rem;
-      font-weight: 600;
-      color: #f4fbfd;
-      background: linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0.02));
-      box-shadow:
-        inset 0 1px 0 rgba(255,255,255,0.08),
-        0 8px 18px rgba(0,0,0,0.18);
-    }
-
-    .erebor-card__content {
-      min-width: 0;
-      display: flex;
-      flex-direction: column;
-      gap: 0.35rem;
-    }
-
-    .erebor-card__title-row {
-      display: flex;
-      align-items: center;
-      gap: 0.45rem;
-      min-width: 0;
-      flex-wrap: wrap;
-    }
-
-    .erebor-card__title {
-      min-width: 0;
-      font-size: 0.9rem;
-      font-weight: 600;
-      color: var(--canvas-text, #eef3f8);
-    }
-
-    .erebor-card__meta {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.45rem;
-      align-items: center;
-      color: var(--canvas-muted, #8f9baa);
-      font-size: 0.74rem;
-    }
-
-    .erebor-card__description {
-      color: var(--canvas-subtle, #b8c3cf);
-      font-size: 0.8rem;
-      line-height: 1.45;
-    }
-
-    .erebor-card__aside {
-      display: flex;
-      flex-direction: column;
-      align-items: flex-end;
-      gap: 0.4rem;
-      color: var(--canvas-muted, #8f9baa);
-      font-size: 0.72rem;
-    }
-
-    .erebor-kpi {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 0.6rem;
-    }
-
-    .erebor-kpi__item {
-      padding: 0.75rem;
-      border-radius: 0.9rem;
-      border: 1px solid rgba(170, 182, 200, 0.1);
-      background: rgba(10, 14, 19, 0.56);
-    }
-
-    .erebor-kpi__label {
-      font-size: 0.72rem;
-      color: var(--canvas-muted, #8f9baa);
-      margin-bottom: 0.3rem;
-    }
-
-    .erebor-kpi__value {
-      font-size: 1rem;
-      font-weight: 600;
-      color: var(--canvas-text, #eef3f8);
-    }
-
-    .erebor-empty,
-    .erebor-state {
-      display: grid;
-      place-items: center;
-      min-height: 8rem;
-      padding: 1rem;
-      border: 1px dashed rgba(170, 182, 200, 0.14);
-      border-radius: 1rem;
-      color: var(--canvas-muted, #8f9baa);
-      text-align: center;
-      background: rgba(10, 14, 19, 0.36);
-    }
-
-    .erebor-state strong {
-      color: var(--canvas-text, #eef3f8);
-      display: block;
-      margin-bottom: 0.25rem;
-    }
-
-    .erebor-inspector {
-      display: flex;
-      flex-direction: column;
-      gap: 0.9rem;
-    }
-
-    .erebor-inspector__hero {
-      display: grid;
-      grid-template-columns: auto 1fr;
-      gap: 0.85rem;
-      align-items: start;
-      padding: 0.9rem;
-      border-radius: 1rem;
-      border: 1px solid rgba(170, 182, 200, 0.12);
-      background:
-        radial-gradient(circle at top right, rgba(143, 214, 230, 0.08), transparent 36%),
-        rgba(11, 15, 20, 0.72);
-    }
-
-    .erebor-inspector__avatar {
-      width: 3rem;
-      height: 3rem;
-      border-radius: 1rem;
-      display: grid;
-      place-items: center;
+      font-size: 0.82rem;
       font-weight: 700;
-      color: #f4fbfd;
-      box-shadow:
-        inset 0 1px 0 rgba(255,255,255,0.08),
-        0 10px 24px rgba(0,0,0,0.22);
+      letter-spacing: 0.04em;
+      color: #eff8fb;
+      background:
+        radial-gradient(circle at 30% 30%, rgba(255,255,255,0.16), transparent 42%),
+        linear-gradient(135deg, rgba(79,192,222,0.32), rgba(79,192,222,0.08));
+      border: 1px solid rgba(79,192,222,0.22);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.04);
     }
 
-    .erebor-inspector__title {
-      font-size:
+    .tone-amber {
+      background:
+        radial-gradient(circle at 30% 30%, rgba(255,255,255,0.14), transparent 42%),
+        linear-gradient(135deg, rgba(201,135,29,0.34), rgba(201,135,29,0.08));
+      border-color: rgba(201,135,29,0.24);
+    }
+
+    .tone-slate {
+      background:
+        radial-gradient(circle at 30% 30%, rgba(255,255,255,0.12), transparent 42%),
+        linear-gradient(135deg, rgba(111,130,157,0.28), rgba(111,130,157,0.08));
+      border-color: rgba(111,130,157,0.24);
+    }
+
+    .entity-card__meta,
+    .result-card__meta,
+    .inspector-hero__meta {
+      min-width: 0;
+    }
+
+    .entity-card__title,
+    .result-card__title,
+    .inspector-title {
+      margin: 0;
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: var(--text-primary, #e5ebf3);
+      overflow-wrap: anywhere;
+    }
+
+    .entity-card__subtitle,
+    .result-card__subtitle,
+    .inspector-subtitle {
+      margin: 0.2rem 0 0;
+      font-size: 0.8rem;
