@@ -28,10 +28,6 @@ export const OSS_CATALOG = {
   ],
 };
 
-const SEED_REPOS = ["postgres/postgres", "apache/kafka", "grafana/grafana"];
-const SEED_PAPER_ID = "W2626778328";
-const SEED_PLACE_QUERY = "Berlin, Germany";
-
 export const SEED_GRAPH = {
   nodes: [
     {
@@ -57,7 +53,7 @@ export const SEED_GRAPH = {
       url: "https://github.com/apache/kafka",
     },
     {
-      id: "oa:W2626778328",
+      id: "oa:W2741809807",
       kind: "paper",
       label: "Attention Is All You Need",
       source: "OpenAlex",
@@ -65,7 +61,7 @@ export const SEED_GRAPH = {
       lat: 52.52,
       lng: 13.4,
       score: 99,
-      url: "https://openalex.org/W2626778328",
+      url: "https://openalex.org/W2741809807",
     },
     {
       id: "geo:berlin",
@@ -91,102 +87,11 @@ export const SEED_GRAPH = {
   ],
   edges: [
     { from: "gh:postgres/postgres", to: "gh:apache/kafka" },
-    { from: "gh:apache/kafka", to: "oa:W2626778328" },
-    { from: "oa:W2626778328", to: "geo:berlin" },
+    { from: "gh:apache/kafka", to: "oa:W2741809807" },
+    { from: "oa:W2741809807", to: "geo:berlin" },
     { from: "geo:berlin", to: "gh:grafana/grafana" },
   ],
 };
-
-function githubRepoNode(it) {
-  return {
-    id: `gh:${it.full_name}`,
-    kind: "repo",
-    label: it.full_name,
-    description: it.description || "",
-    source: "GitHub",
-    url: it.html_url,
-    score: Math.min(99, Math.floor((it.stargazers_count || 0) / 1000) + 50),
-    stats: { stars: it.stargazers_count || 0, forks: it.forks_count || 0, language: it.language || "—" },
-    lat: 37.77,
-    lng: -122.42,
-  };
-}
-
-function openAlexPaperNode(w) {
-  const wid = (w.id || "").split("/").pop();
-  const author = (w.authorships || [{}])[0]?.author?.display_name || "";
-  return {
-    id: `oa:${wid}`,
-    kind: "paper",
-    label: w.display_name || wid,
-    description: author ? `${author} — ${w.publication_year || ""}`.trim() : w.display_name || "",
-    source: "OpenAlex",
-    url: w.id || `https://openalex.org/${wid}`,
-    score: Math.min(99, Math.floor((w.cited_by_count || 0) / 500) + 50),
-    stats: { citations: w.cited_by_count || 0, year: w.publication_year || "—", type: w.type || "—" },
-    lat: 52.52,
-    lng: 13.4,
-  };
-}
-
-function nominatimPlaceNode(r) {
-  return {
-    id: `geo:${r.place_id}`,
-    kind: "place",
-    label: r.display_name || "",
-    description: r.display_name || "",
-    source: "Nominatim",
-    score: Math.min(99, Math.round(parseFloat(r.importance || 0) * 100)),
-    stats: { type: r.type || "—", importance: Math.round(parseFloat(r.importance || 0) * 1000) / 1000 },
-    lat: parseFloat(r.lat || 0),
-    lng: parseFloat(r.lon || 0),
-  };
-}
-
-function chainEdges(nodes) {
-  const edges = [];
-  for (let i = 0; i < nodes.length - 1; i++) {
-    edges.push({ from: nodes[i].id, to: nodes[i + 1].id });
-  }
-  return edges;
-}
-
-/** Boot graph with live OSS metadata (stars, citations, geocode). */
-export async function fetchLiveGraph() {
-  const [repoNodes, paperNode, placeNode] = await Promise.all([
-    Promise.all(
-      SEED_REPOS.map(async (full) => {
-        const [owner, repo] = full.split("/");
-        const res = await fetch(`https://api.github.com/repos/${owner}/${repo}`, {
-          headers: { Accept: "application/vnd.github+json", "User-Agent": UA },
-        });
-        if (!res.ok) throw new Error(`github repo ${full} → ${res.status}`);
-        return githubRepoNode(await res.json());
-      }),
-    ),
-    (async () => {
-      const res = await fetch(`https://api.openalex.org/works/${SEED_PAPER_ID}`, {
-        headers: { "User-Agent": UA },
-      });
-      if (!res.ok) throw new Error(`openalex → ${res.status}`);
-      return openAlexPaperNode(await res.json());
-    })(),
-    (async () => {
-      const url = new URL("https://nominatim.openstreetmap.org/search");
-      url.searchParams.set("q", SEED_PLACE_QUERY);
-      url.searchParams.set("format", "json");
-      url.searchParams.set("limit", "1");
-      const res = await fetch(url, { headers: { "User-Agent": UA } });
-      if (!res.ok) throw new Error(`nominatim → ${res.status}`);
-      const rows = await res.json();
-      if (!rows.length) throw new Error("nominatim → no results");
-      return nominatimPlaceNode(rows[0]);
-    })(),
-  ]);
-
-  const nodes = [...repoNodes.slice(0, 2), paperNode, placeNode, repoNodes[2]];
-  return { nodes, edges: chainEdges(nodes) };
-}
 
 async function githubSearch(q, limit = 6) {
   const url = new URL("https://api.github.com/search/repositories");
@@ -197,10 +102,19 @@ async function githubSearch(q, limit = 6) {
   const res = await fetch(url, { headers: { Accept: "application/vnd.github+json" } });
   if (!res.ok) throw new Error(`github → ${res.status}`);
   const items = (await res.json()).items || [];
-  return items.map((it) => {
-    const node = githubRepoNode(it);
-    return { ...node, sub: it.description || "" };
-  });
+  return items.map((it) => ({
+    id: `gh:${it.full_name}`,
+    kind: "repo",
+    label: it.full_name,
+    sub: it.description || "",
+    description: it.description || "",
+    source: "GitHub",
+    url: it.html_url,
+    score: Math.min(99, Math.floor((it.stargazers_count || 0) / 100)),
+    stats: { stars: it.stargazers_count || 0, forks: it.forks_count || 0 },
+    lat: 37.77,
+    lng: -122.42,
+  }));
 }
 
 async function openAlexSearch(q, limit = 5) {
@@ -211,12 +125,20 @@ async function openAlexSearch(q, limit = 5) {
   if (!res.ok) throw new Error(`openalex → ${res.status}`);
   const results = (await res.json()).results || [];
   return results.map((w) => {
-    const node = openAlexPaperNode(w);
+    const wid = (w.id || "").split("/").pop();
     const author = (w.authorships || [{}])[0]?.author?.display_name || "";
     return {
-      ...node,
+      id: `oa:${wid}`,
+      kind: "paper",
+      label: w.display_name || wid,
       sub: author,
-      description: w.abstract_inverted_index ? "Abstract available" : node.description,
+      description: w.abstract_inverted_index ? "Abstract available" : "",
+      source: "OpenAlex",
+      url: w.id,
+      score: Math.min(99, Math.floor((w.cited_by_count || 0) / 50)),
+      stats: { citations: w.cited_by_count || 0, year: w.publication_year },
+      lat: 52.52,
+      lng: 13.4,
     };
   });
 }
@@ -229,10 +151,18 @@ async function nominatimSearch(q, limit = 4) {
   const res = await fetch(url, { headers: { "User-Agent": UA } });
   if (!res.ok) throw new Error(`nominatim → ${res.status}`);
   const rows = await res.json();
-  return rows.map((r) => {
-    const node = nominatimPlaceNode(r);
-    return { ...node, sub: r.type || "" };
-  });
+  return rows.map((r) => ({
+    id: `geo:${r.place_id}`,
+    kind: "place",
+    label: r.display_name || "",
+    sub: r.type || "",
+    description: r.display_name || "",
+    source: "Nominatim",
+    score: 70,
+    lat: parseFloat(r.lat || 0),
+    lng: parseFloat(r.lon || 0),
+    stats: { type: r.type, importance: Math.round(parseFloat(r.importance || 0) * 1000) / 1000 },
+  }));
 }
 
 export async function directSearch(q) {
@@ -283,26 +213,12 @@ export async function directOpenAlexWork(workId) {
 }
 
 export async function directGeoPlace(placeId) {
-  const lookup = await fetch(
-    `https://nominatim.openstreetmap.org/lookup?place_ids=${encodeURIComponent(placeId)}&format=json`,
+  const res = await fetch(
+    `https://nominatim.openstreetmap.org/lookup?osm_ids=N${encodeURIComponent(placeId)}&format=json`,
     { headers: { "User-Agent": UA } },
   );
-  if (lookup.ok) {
-    const rows = await lookup.json();
-    if (rows.length) {
-      const r = rows[0];
-      return {
-        description: r.display_name || "",
-        stats: { type: r.type, lat: r.lat, lon: r.lon },
-      };
-    }
-  }
-  const search = await fetch(
-    `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(SEED_PLACE_QUERY)}&format=json&limit=1`,
-    { headers: { "User-Agent": UA } },
-  );
-  if (!search.ok) throw new Error(`nominatim place → ${search.status}`);
-  const rows = await search.json();
+  if (!res.ok) throw new Error(`nominatim place → ${res.status}`);
+  const rows = await res.json();
   if (!rows.length) return { description: "", stats: {} };
   const r = rows[0];
   return {
