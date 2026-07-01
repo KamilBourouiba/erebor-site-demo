@@ -1,23 +1,145 @@
 :root {
-  --bg-0: #030508;
-  --bg-1: #070b12;
-  --bg-2: #0c121c;
-  --bg-3: #121a28;
-  --line: rgba(148, 163, 184, 0.12);
-  --line-strong: rgba(148, 163, 184, 0.22);
-  --text: #e8edf5;
-  --muted: #8b98ad;
-  --dim: #5c677a;
-  --accent: #3dd6c6;
-  --accent-2: #5b8def;
-  --warn: #f0b429;
-  --danger: #ff6b6b;
-  --glow: rgba(61, 214, 198, 0.35);
-  --font-ui: "IBM Plex Sans", system-ui, sans-serif;
-  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
-  --radius: 10px;
-  --shadow: 0 24px 80px rgba(0, 0, 0, 0.55);
-  --panel-w: 340px;
-  --header-h: 52px;
-  --timeline-h: 140px;
+  color-scheme: dark;
+
+  /* Typography */
+  --font-sans: "IBM Plex Sans", "Inter", "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: "IBM Plex Mono", "SFMono-Regular", ui-monospace, Menlo, Monaco, Consolas, monospace;
+
+  /* Obsidian neutrals */
+  --color-bg: #07090d;
+  --color-bg-elevated: #0b0f14;
+  --color-bg-panel: #10161d;
+  --color-bg-panel-2: #131b24;
+  --color-bg-panel-3: #18212c;
+  --color-bg-inset: #0a0e13;
+  --color-bg-overlay: rgba(6, 9, 13, 0.82);
+  --color-bg-glass: rgba(16, 22, 29, 0.72);
+
+  --color-surface: #111821;
+  --color-surface-2: #16202a;
+  --color-surface-3: #1b2632;
+  --color-surface-hover: #202d3a;
+  --color-surface-active: #243444;
+
+  --color-border: rgba(138, 156, 176, 0.18);
+  --color-border-strong: rgba(162, 183, 205, 0.28);
+  --color-border-accent: rgba(94, 168, 255, 0.38);
+  --color-hairline: rgba(255, 255, 255, 0.05);
+
+  /* Text */
+  --color-text: #edf3fb;
+  --color-text-strong: #ffffff;
+  --color-text-muted: #a8b6c6;
+  --color-text-soft: #7f91a5;
+  --color-text-faint: #627487;
+  --color-text-inverse: #071019;
+
+  /* Accents */
+  --color-accent: #5ea8ff;
+  --color-accent-strong: #7db9ff;
+  --color-accent-soft: rgba(94, 168, 255, 0.14);
+  --color-accent-faint: rgba(94, 168, 255, 0.08);
+  --color-accent-glow: rgba(94, 168, 255, 0.32);
+
+  --color-cyan: #4fd1c5;
+  --color-cyan-soft: rgba(79, 209, 197, 0.14);
+  --color-amber: #f2b35d;
+  --color-amber-soft: rgba(242, 179, 93, 0.14);
+  --color-red: #ef6b73;
+  --color-red-soft: rgba(239, 107, 115, 0.14);
+  --color-green: #5fd38d;
+  --color-green-soft: rgba(95, 211, 141, 0.14);
+
+  /* Semantic */
+  --color-success: var(--color-green);
+  --color-warning: var(--color-amber);
+  --color-danger: var(--color-red);
+  --color-info: var(--color-accent);
+
+  /* Globe / data viz */
+  --globe-ocean: #08111a;
+  --globe-land: #12324a;
+  --globe-land-muted: #0f2738;
+  --globe-atmosphere: rgba(94, 168, 255, 0.18);
+  --globe-grid: rgba(125, 185, 255, 0.12);
+  --globe-node: #8fd0ff;
+  --globe-node-hot: #f2b35d;
+  --globe-arc: rgba(94, 168, 255, 0.82);
+  --globe-arc-dim: rgba(94, 168, 255, 0.28);
+
+  /* Shadows */
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.28);
+  --shadow-sm: 0 6px 18px rgba(0, 0, 0, 0.28);
+  --shadow-md: 0 14px 36px rgba(0, 0, 0, 0.34);
+  --shadow-lg: 0 24px 64px rgba(0, 0, 0, 0.42);
+  --shadow-glow: 0 0 0 1px rgba(94, 168, 255, 0.12), 0 0 28px rgba(94, 168, 255, 0.16);
+
+  /* Radius */
+  --radius-xs: 8px;
+  --radius-sm: 12px;
+  --radius-md: 16px;
+  --radius-lg: 22px;
+  --radius-xl: 28px;
+  --radius-pill: 999px;
+
+  /* Spacing */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-7: 1.75rem;
+  --space-8: 2rem;
+  --space-10: 2.5rem;
+  --space-12: 3rem;
+  --space-14: 3.5rem;
+  --space-16: 4rem;
+  --space-20: 5rem;
+
+  /* Layout */
+  --header-height: 4.5rem;
+  --sidebar-width: 22rem;
+  --inspector-width: 24rem;
+  --timeline-height: 15rem;
+  --content-max-width: 96rem;
+  --panel-padding: 1rem;
+  --shell-gap: 1rem;
+
+  /* Controls */
+  --control-height-sm: 2rem;
+  --control-height: 2.75rem;
+  --control-height-lg: 3.25rem;
+  --omnibar-height: 3.5rem;
+
+  /* Motion */
+  --ease-standard: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-snappy: cubic-bezier(0.16, 1, 0.3, 1);
+  --duration-fast: 140ms;
+  --duration-base: 220ms;
+  --duration-slow: 360ms;
+
+  /* Focus */
+  --focus-ring: 0 0 0 1px rgba(94, 168, 255, 0.4), 0 0 0 4px rgba(94, 168, 255, 0.14);
+
+  /* Backdrop */
+  --backdrop-blur: 18px;
+  --backdrop-saturate: 140%;
+}
+
+@media (max-width: 768px) {
+  :root {
+    --header-height: 4rem;
+    --sidebar-width: 100%;
+    --inspector-width: 100%;
+    --timeline-height: 12rem;
+    --panel-padding: 0.875rem;
+    --shell-gap: 0.75rem;
+    --omnibar-height: 3.125rem;
+    --control-height: 2.625rem;
+    --control-height-lg: 3rem;
+    --radius-md: 14px;
+    --radius-lg: 18px;
+    --radius-xl: 22px;
+  }
 }
