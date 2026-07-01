@@ -1,88 +1,600 @@
-.app-shell {
-  display: grid;
-  grid-template-rows: var(--header-h) 1fr var(--timeline-h);
-  height: 100vh;
-  background:
-    radial-gradient(ellipse 80% 50% at 50% -20%, rgba(61, 214, 198, 0.08), transparent),
-    linear-gradient(180deg, var(--bg-0), var(--bg-1));
+:root {
+  --shell-max-width: 1680px;
+  --shell-gutter: 12px;
+  --shell-radius: 18px;
+  --shell-radius-lg: 22px;
+  --shell-header-height: 72px;
+  --shell-panel-gap: 12px;
+  --shell-panel-padding: 14px;
+  --shell-panel-padding-lg: 18px;
+  --shell-timeline-height: 240px;
+  --shell-workspace-min-height: 420px;
+  --shell-shadow:
+    0 18px 48px rgba(0, 0, 0, 0.34),
+    inset 0 1px 0 rgba(255, 255, 255, 0.03);
+  --shell-border: 1px solid var(--color-border, rgba(138, 156, 176, 0.18));
+  --shell-backdrop: blur(18px) saturate(140%);
 }
 
-.app-header {
+.app-shell {
+  position: relative;
+  min-height: 100vh;
+  width: 100%;
+  padding: var(--shell-gutter);
+}
+
+.app-shell::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 18% 0%, rgba(94, 168, 255, 0.08), transparent 28%),
+    radial-gradient(circle at 100% 18%, rgba(79, 209, 197, 0.05), transparent 22%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent 16%);
+  z-index: 0;
+}
+
+.app-shell__inner {
+  position: relative;
+  z-index: 1;
+  width: min(100%, var(--shell-max-width));
+  margin: 0 auto;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: var(--shell-panel-gap);
+  min-height: calc(100vh - (var(--shell-gutter) * 2));
+}
+
+.app-shell__header,
+.app-shell__workspace,
+.app-shell__timeline,
+.shell-panel {
+  min-width: 0;
+  border: var(--shell-border);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.025), rgba(255, 255, 255, 0)),
+    var(--color-bg-glass, rgba(16, 22, 29, 0.72));
+  box-shadow: var(--shell-shadow);
+  backdrop-filter: var(--shell-backdrop);
+  -webkit-backdrop-filter: var(--shell-backdrop);
+}
+
+.app-shell__header {
+  position: sticky;
+  top: var(--shell-gutter);
+  z-index: 30;
+  min-height: var(--shell-header-height);
+  border-radius: var(--shell-radius-lg);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+}
+
+.app-shell__header-inner {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.app-shell__brand {
   display: flex;
   align-items: center;
-  gap: 16px;
-  padding: 0 16px;
-  border-bottom: 1px solid var(--line);
-  background: rgba(3, 5, 8, 0.85);
-  backdrop-filter: blur(12px);
-  z-index: 10;
+  gap: 12px;
+  min-width: 0;
 }
 
-.brand {
+.app-shell__brand-mark {
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  color: var(--color-text-strong, #ffffff);
+  background:
+    linear-gradient(180deg, rgba(94, 168, 255, 0.18), rgba(94, 168, 255, 0.06)),
+    var(--color-surface-2, #16202a);
+  border: 1px solid var(--color-border-accent, rgba(94, 168, 255, 0.38));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 0 0 1px rgba(94, 168, 255, 0.08),
+    0 10px 24px rgba(0, 0, 0, 0.28);
+}
+
+.app-shell__brand-copy {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.app-shell__eyebrow {
+  font-family: var(--font-mono, "IBM Plex Mono", monospace);
+  font-size: 11px;
+  line-height: 1;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-text-faint, #627487);
+}
+
+.app-shell__title {
+  font-size: clamp(1rem, 0.9rem + 0.6vw, 1.2rem);
+  line-height: 1.05;
+  color: var(--color-text-strong, #ffffff);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.app-shell__subtitle {
+  font-size: 13px;
+  color: var(--color-text-muted, #a8b6c6);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.app-shell__header-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  gap: 10px;
+  min-width: 0;
+}
+
+.app-shell__workspace {
+  border-radius: var(--shell-radius-lg);
+  padding: var(--shell-panel-padding);
+  min-height: var(--shell-workspace-min-height);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--shell-panel-gap);
+  overflow: hidden;
+}
+
+.app-shell__workspace-main,
+.app-shell__workspace-side,
+.app-shell__workspace-stack {
+  min-width: 0;
+  min-height: 0;
+}
+
+.app-shell__workspace-main {
+  display: grid;
+  gap: var(--shell-panel-gap);
+  min-height: min(68vh, 760px);
+}
+
+.app-shell__workspace-side {
+  display: grid;
+  gap: var(--shell-panel-gap);
+  align-content: start;
+}
+
+.app-shell__workspace-stack {
+  display: grid;
+  gap: var(--shell-panel-gap);
+  grid-auto-rows: minmax(0, auto);
+}
+
+.app-shell__timeline {
+  border-radius: var(--shell-radius-lg);
+  min-height: var(--shell-timeline-height);
+  max-height: 38vh;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  overflow: hidden;
+}
+
+.app-shell__timeline-body {
+  min-height: 0;
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.shell-panel {
+  position: relative;
+  border-radius: var(--shell-radius);
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.shell-panel--inset {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.018), rgba(255, 255, 255, 0)),
+    var(--color-bg-panel, #10161d);
+}
+
+.shell-panel--raised {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0)),
+    var(--color-bg-panel-2, #131b24);
+  border-color: var(--color-border-strong, rgba(162, 183, 205, 0.28));
+}
+
+.shell-panel--accent {
+  border-color: var(--color-border-accent, rgba(94, 168, 255, 0.38));
+  box-shadow:
+    0 18px 48px rgba(0, 0, 0, 0.34),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    0 0 0 1px rgba(94, 168, 255, 0.08);
+}
+
+.shell-panel__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 14px 12px;
+  border-bottom: 1px solid var(--color-hairline, rgba(255, 255, 255, 0.05));
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent);
+}
+
+.shell-panel__title-group {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.shell-panel__eyebrow {
+  font-family: var(--font-mono, "IBM Plex Mono", monospace);
+  font-size: 11px;
+  line-height: 1;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-text-faint, #627487);
+}
+
+.shell-panel__title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-text-strong, #ffffff);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.shell-panel__meta {
+  font-size: 12px;
+  color: var(--color-text-soft, #7f91a5);
+}
+
+.shell-panel__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.shell-panel__body {
+  min-width: 0;
+  min-height: 0;
+  padding: var(--shell-panel-padding);
+}
+
+.shell-panel__body--flush {
+  padding: 0;
+}
+
+.shell-panel__body--scroll {
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.shell-panel__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px 14px;
+  border-top: 1px solid var(--color-hairline, rgba(255, 255, 255, 0.05));
+  color: var(--color-text-soft, #7f91a5);
+}
+
+.shell-scroll {
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(125, 185, 255, 0.28) transparent;
+}
+
+.shell-scroll::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.shell-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.shell-scroll::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+  background-color: rgba(125, 185, 255, 0.24);
+}
+
+.shell-scroll::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(125, 185, 255, 0.34);
+}
+
+.shell-grid {
+  display: grid;
+  gap: var(--shell-panel-gap);
+  min-width: 0;
+  min-height: 0;
+}
+
+.shell-grid--2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.shell-grid--3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.shell-split {
+  display: grid;
+  gap: var(--shell-panel-gap);
+  min-width: 0;
+  min-height: 0;
+}
+
+.shell-split--sidebar {
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 360px);
+}
+
+.shell-split--inspector {
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 420px);
+}
+
+.shell-toolbar {
   display: flex;
   align-items: center;
   gap: 10px;
-  min-width: 160px;
+  flex-wrap: wrap;
+  min-width: 0;
 }
 
-.brand-mark {
-  width: 28px;
-  height: 28px;
-  border-radius: 8px;
-  background: linear-gradient(135deg, var(--accent), var(--accent-2));
-  box-shadow: 0 0 24px var(--glow);
+.shell-toolbar--between {
+  justify-content: space-between;
 }
 
-.brand-name {
-  font-weight: 600;
-  letter-spacing: 0.12em;
-  font-size: 13px;
-}
-
-.header-sources {
+.shell-chip-row {
   display: flex;
+  align-items: center;
   gap: 8px;
-  flex: 1;
-  overflow-x: auto;
-  scrollbar-width: none;
+  flex-wrap: wrap;
 }
 
-.source-chip {
-  padding: 4px 10px;
-  border-radius: 999px;
-  border: 1px solid var(--line);
-  font-size: 11px;
-  color: var(--muted);
-  white-space: nowrap;
+.shell-divider {
+  width: 100%;
+  height: 1px;
+  background: var(--color-hairline, rgba(255, 255, 255, 0.05));
 }
 
-.source-chip.active {
-  color: var(--text);
-  border-color: rgba(61, 214, 198, 0.4);
-  background: rgba(61, 214, 198, 0.08);
-}
-
-.header-actions {
+.shell-statusbar {
   display: flex;
-  gap: 8px;
-}
-
-.btn-ghost {
-  padding: 6px 12px;
-  border-radius: var(--radius);
-  border: 1px solid var(--line);
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid var(--color-border, rgba(138, 156, 176, 0.18));
   background: rgba(255, 255, 255, 0.02);
+}
+
+.shell-statusbar__group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.shell-statusbar__label {
   font-size: 12px;
+  color: var(--color-text-soft, #7f91a5);
 }
 
-.btn-ghost:hover {
-  border-color: var(--line-strong);
-  background: rgba(255, 255, 255, 0.05);
+.shell-statusbar__value {
+  font-family: var(--font-mono, "IBM Plex Mono", monospace);
+  font-size: 12px;
+  color: var(--color-text, #edf3fb);
 }
 
-.workspace {
-  display: grid;
-  grid-template-columns: var(--panel-w) 1fr var(--panel-w);
+.shell-dock {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.shell-dock--end {
+  justify-content: flex-end;
+}
+
+.shell-fill {
+  min-width: 0;
   min-height: 0;
-  position: relative;
+  width: 100%;
+  height: 100%;
 }
+
+.shell-frame {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 50% 0%, rgba(94, 168, 255, 0.06), transparent 36%),
+    var(--color-bg-inset, #0a0e13);
+}
+
+.shell-frame::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.02);
+}
+
+.shell-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-height: 320px;
+}
+
+.shell-mobile-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 0 12px;
+  border-radius: 12px;
+  border: 1px solid var(--color-border, rgba(138, 156, 176, 0.18));
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--color-text, #edf3fb);
+}
+
+.shell-mobile-toggle[aria-expanded="true"] {
+  border-color: var(--color-border-accent, rgba(94, 168, 255, 0.38));
+  background: var(--color-accent-soft, rgba(94, 168, 255, 0.14));
+}
+
+.shell-collapsible {
+  min-width: 0;
+  min-height: 0;
+}
+
+@media (min-width: 769px) {
+  :root {
+    --shell-gutter: 16px;
+    --shell-panel-gap: 14px;
+    --shell-panel-padding: 16px;
+    --shell-panel-padding-lg: 20px;
+    --shell-header-height: 78px;
+    --shell-timeline-height: 260px;
+  }
+
+  .app-shell__header {
+    padding: 14px 18px;
+  }
+
+  .app-shell__header-inner {
+    grid-template-columns: minmax(220px, auto) minmax(0, 1fr) auto;
+    gap: 16px;
+  }
+
+  .app-shell__header-actions {
+    justify-content: flex-end;
+    flex-wrap: nowrap;
+  }
+
+  .app-shell__workspace {
+    grid-template-columns: minmax(0, 1fr) minmax(320px, 400px);
+    align-items: stretch;
+    padding: var(--shell-panel-padding-lg);
+  }
+
+  .app-shell__workspace-main {
+    min-height: min(72vh, 860px);
+  }
+
+  .app-shell__timeline {
+    min-height: var(--shell-timeline-height);
+  }
+
+  .shell-panel__header {
+    padding: 16px 18px 14px;
+  }
+
+  .shell-panel__body {
+    padding: var(--shell-panel-padding-lg);
+  }
+
+  .shell-panel__footer {
+    padding: 14px 18px 16px;
+  }
+}
+
+@media (max-width: 768px) {
+  :root {
+    --shell-header-height: 64px;
+    --shell-timeline-height: 220px;
+    --shell-workspace-min-height: 0px;
+  }
+
+  .app-shell {
+    padding: 10px;
+  }
+
+  .app-shell__inner {
+    min-height: calc(100vh - 20px);
+  }
+
+  .app-shell__header {
+    top: 10px;
+    padding: 12px;
+  }
+
+  .app-shell__brand-mark {
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+  }
+
+  .app-shell__subtitle,
+  .shell-panel__meta {
+    white-space: normal;
+  }
+
+  .app-shell__workspace {
+    padding: 10px;
+    min-height: 0;
+  }
+
+  .app-shell__workspace-main {
+    min-height: 48vh;
+  }
+
+  .app-shell__workspace-side {
+    grid-auto-rows: minmax(0, auto);
+  }
+
+  .app-shell__timeline {
+    max-height: none;
+    min-height: var(--shell-timeline-height);
+  }
+
+  .shell-grid--2,
+  .shell-grid--3,
+  .shell-split--sidebar,
+  .shell-split--inspector {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .shell-panel__header,
+  .shell-panel__footer {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+
+  .shell-panel__body {
